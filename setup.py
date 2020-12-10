@@ -15,6 +15,7 @@ setuptools.setup(
     install_requires=[
         'requests==2.25.0',
         'DeepDiff==5.0.2',
+        'argparse==1.4.0'
     ],
 
     classifiers=[

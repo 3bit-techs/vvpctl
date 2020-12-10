@@ -1,4 +1,318 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-print ('Hello VVPCTL')
+import requests
+import logging
+import json
+import os
+import glob
+import time
+import subprocess
+import sys
+
+from timeit import default_timer as timer
+from deepdiff import DeepDiff
+from argparse import ArgumentParser
+
+def findDeploymentTarget(arguments):
+    ''' Find the default deployment target on the list of all deployment targets, and if found return it's id, otherwise create one and return it's id '''
+
+    # recovering the deployment target
+    getDeploymentTargetsRequest = requests.get(
+        "%s/api/v1/namespaces/%s/deployment-targets" % (arguments.server, arguments.namespace), headers={"accept": "application/json", "content-type": "application/json"})
+
+    # error check
+    getDeploymentTargetsRequest.raise_for_status()
+
+    # search the deployment target on the server list
+    deploymentTarget = next((sub for sub in getDeploymentTargetsRequest.json()[
+                            'items'] if sub['metadata']['name'] == arguments.deployment_target), None)
+
+    # checking if the default deployment target exists
+    if deploymentTarget == None:
+
+        # create and retrieve
+        deploymentTarget = createDeploymentTarget(arguments)
+
+    else:
+
+        logging.info("Found deployment target %s with id %s" %
+                     (arguments.deployment_target, deploymentTarget['metadata']['id']))
+
+    return deploymentTarget
+
+def createDeploymentTarget(arguments):
+    '''Create a default deployment target to be used by the app'''
+
+    # request
+    default = {
+        "apiVersion": "v1",
+        "kind": "DeploymentTarget",
+        "metadata": {
+            "name": arguments.target,
+            "namespace": arguments.namespace
+        },
+        "spec": {
+            "kubernetes": {
+                "namespace": arguments.deployment_target
+            }
+        }
+    }
+
+    logging.info("Couldn't find the default deployment target %s on the server : Creating (dry_run = %s)" %
+                     (target, str(arguments.dry_run)))
+
+    # creating
+    if not arguments.dry_run:
+
+        result = requests.post(
+            "%s/api/v1/namespaces/%s/deployment-targets" % (arguments.server, arguments.namespace), json=default, headers={"accept": "application/json", "content-type": "application/json"})
+
+        # error check
+        result.raise_for_status()
+
+        return result.json()
+
+    return None
+
+def listDeployments(arguments):
+    ''' List the list of all installed deployments'''
+
+    # recovering vvp deployments
+    getDeploymentsRequest = requests.get("%s/api/v1/namespaces/%s/deployments" % (arguments.server, arguments.namespace),
+                                        headers={"accept": "application/json", "content-type": "application/json"})
+
+    # error check
+    getDeploymentsRequest.raise_for_status()
+
+    # get deployments
+    return getDeploymentsRequest.json()
+
+def findDeployment(arguments, deploymentConfig):
+
+    # retrieve the list of installed deployments
+    deploymentsList = listDeployments(arguments)
+
+    # search the deployment on the running deployments
+    deployment = next(
+        (sub for sub in deploymentsList['items'] if sub['metadata']['name'] == deploymentConfig['metadata']['name']), None)
+    
+    return deployment
+
+
+def readDeploymentConfig(arguments):
+    '''Read the deployment config file from disk and parse the JSON'''
+
+    deploymentConfig = None
+
+    # open the deployment file
+    with open(arguments.file, 'r', encoding='utf-8') as deploymentConfigFile:
+
+        # parse the deployment from the file contents
+        deploymentConfig = json.load(deploymentConfigFile)
+    
+    return deploymentConfig
+
+def delete(arguments):
+    logging.info("Deleting")
+
+def waitDeploymentForDesiredState(arguments, deploymentConfig):
+
+    start = timer()
+
+    done = False
+
+    # wait for transition
+    while not done:
+
+        # retrieve the deployment
+        deployment = findDeployment(arguments, deploymentConfig)
+
+        # elapsed time
+        elapsed = timer() - start
+
+        # check timeout
+        if elapsed > arguments.timeout:
+            raise Exception("Timeout occured (%d seconds) while waiting for the transition of deployment %s to desired state: %s, current state: %s" % (elapsed, deployment['metadata']['name'], deployment['spec']['state'], deployment['status']['state']))
+
+        # checking if the deployment transition has failed,
+        # at this point a manual intervention is necessary - for example cancelling the Deployment
+        if deployment['status']['state'] == 'FAILED':
+
+            # cancel before continue
+            cancel(arguments, deployment)
+
+        elif deployment['status']['state'] != deployment['spec']['state']:
+            logging.info("Deployment %s found on the server (Desired state: %s, Current state: %s) : Waiting for the states %s" % (
+                deployment['metadata']['name'], deployment['spec']['state'], deployment['status']['state'], str(desiredStates)))
+
+            # wait a little bit
+            time.sleep(10)
+
+        else:
+            # transition finished
+            done = True
+
+def deleteCommand(arguments):
+
+    try:
+        # retrieve the deployment config
+        deploymentConfig = readDeploymentConfig(arguments)
+
+        # search the deployment on the running deployments
+        deployment = findDeployment(arguments, deploymentConfig)
+
+        # deployment found on the server
+        if deployment != None:
+
+            # wait for transition
+            waitDeploymentForState(arguments, deployment)
+
+            # cancel
+            cancel(arguments, deployment)
+
+        else:
+            logging.info("Deployment %s not found on the server, skipping" % deploymentConfig['metadata']['name'])
+    except Exception as e:
+        logging.exception("An error occured when trying to delete the deployment: %s" % e)
+        # error
+        sys.exit(1)
+
+def updateCommand(arguments):
+
+    try:
+        # retrieve the deployment config
+        deploymentConfig = readDeploymentConfig(arguments)
+
+        # retrieve the deployment target
+        deploymentTarget = findDeploymentTarget(arguments)
+
+        # setting deployment target id if not specified
+        if 'deploymentTargetId' not in deploymentConfig['spec']:
+            deploymentConfig['spec']['deploymentTargetId'] = deploymentTarget['metadata']['id']
+
+        # search the deployment on the running deployments
+        deployment = findDeployment(arguments, deploymentConfig)
+
+        # deployment found on the server
+        if deployment != None:
+
+            # wait for transition (if any)
+            waitDeploymentForDesiredState(arguments, deployment)
+
+            # update the deployment
+            update(arguments, deploymentConfig, deployment)
+
+            # wait for running
+            waitDeploymentForDesiredState(arguments, deployment)
+
+        # deployment not found on the server
+        else:
+
+            # create the deployment
+            create(arguments, deploymentConfig)
+
+            # wait for running
+            waitDeploymentForDesiredState(arguments, deployment)
+
+    except Exception as e:
+        logging.exception("An error occured when trying to update the deployment: %s" % e)
+        # error
+        sys.exit(1)
+
+def upload():
+    logging.info("Uploading")
+
+
+def update(arguments, deploymentConfig, deployment):
+    
+    logging.info("Looking for changes on deployment %s (Desired state: %s, Current state: %s)" % (
+                deployment['metadata']['name'], deployment['spec']['state'], deployment['status']['state']))
+
+    # difference between current and server
+    diff = DeepDiff(deployment, deploymentConfig, exclude_paths={"root['status']", "root['metadata']['id']", "root['metadata']['createdAt']", "root['metadata']['modifiedAt']", "root['metadata']['resourceVersion']", "root['metadata']['annotations']['com.dataartisans.appmanager.controller.deployment.transitioning']", "root['metadata']['annotations']['com.dataartisans.appmanager.controller.deployment.spec.version']", "root['metadata']['annotations']['com.dataartisans.appmanager.controller.deployment.transitioning.since']"})
+
+    # changes found
+    if bool(diff):
+        logging.info("Deployment %s has the following changes %s : Updating (dry_run = %s)" % (deployment['metadata']['name'], str(diff.to_dict()), str(arguments.dry_run)))
+
+        if not arguments.dry_run:
+            # patch
+            result = requests.patch("%s/api/v1/namespaces/%s/deployments/%s" % (
+                arguments.server, arguments.namespace, deployment['metadata']['id']), headers={"accept": "application/json", "content-type": "application/json"}, json=deploymentConfig)
+
+            # error check
+            result.raise_for_status()
+    else:
+        logging.info("Deployment %s has no changes : Ignoring" % deployment['metadata']['name'])
+
+def create(arguments, deploymentConfig):
+
+    # deployment not found
+    logging.info("Deployment %s not found on the server : Creating (dry_run = %s)" %
+                (deploymentConfig['metadata']['name'], str(arguments.dry_run)))
+
+    # dry run
+    if not arguments.dry_run:
+
+        # post
+        result = requests.post(
+            "%s/api/v1/namespaces/%s/deployments" % (arguments.server, arguments.namespace), headers={"accept": "application/json", "content-type": "application/json"}, json=deploymentConfig)
+
+        # error check
+        result.raise_for_status()
+
+def cancel(arguments, deployment):
+
+    logging.info("Cancelling deployment %s (Desired state: %s, Current state: %s) : dry_run = %s" % (
+                deployment['metadata']['name'], deployment['spec']['state'], deployment['status']['state'], str(arguments.dry_run)))
+
+    # cancelling
+    deployment['spec']['status'] = 'CANCELLED'
+
+    # dry run
+    if not arguments.dry_run:
+
+        # patch
+        result = requests.patch("%s/api/v1/namespaces/%s/deployments/%s" % (
+            arguments.server, arguments.namespace, deployment['metadata']['id']), headers={"accept": "application/json", "content-type": "application/json"}, json=deployment)
+
+        # error check
+        result.raise_for_status()
+
+
+if __name__ == "__main__":
+    """main
+
+    The application main method.
+    """
+
+    # logging
+    logging.basicConfig(
+        format="%(asctime)s - %(module)s - %(levelname)s - %(message)s",
+        level=logging.INFO,
+        datefmt="%m/%d/%Y %I:%M:%S %p",
+    )
+
+    # parsing arguments
+    parser = ArgumentParser(prog="vvpctl", description="Ververica Platform Cli, used to interact with the Application Manager API")
+    parser.add_argument("-f", "--file", help="The deployment file", type=str, required=True)
+    parser.add_argument("-s", "--server", help="The ververica platform server address. E.g: http://localhost:8080", type=str, required=True)
+    parser.add_argument("-n", "--namespace", help="The ververica platform namespace. Note: This feature is only available in Ververica Platform Stream Edition and above", default="default", type=str)
+    parser.add_argument("-t", "--deployment-target", help="The Deployment target, which corresponds to different Kubernetes namespaces in the same Kubernetes cluster. If the deployment target doesn't exists the cli will attempt to create one", default="vvp-jobs", type=str)
+    parser.add_argument("-u", "--update", help="Update a deployment", action="store_true")
+    parser.add_argument("-d", "--delete", help="Delete a deployment", action="store_true")
+    parser.add_argument("--timeout", help="The length of time in seconds to wait before giving up on waiting", type=int, default=600)
+    parser.add_argument("--dry-run", help="Only simulate actions without submit the request", action="store_true")
+
+    arguments = parser.parse_args()
+
+    if arguments.update:
+        updateCommand(arguments)
+
+    elif arguments.delete:
+        deleteCommand(arguments)
+
+    else:
+        # print help
+        parser.print_help()
