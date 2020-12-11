@@ -320,6 +320,13 @@ def upload(arguments, deploymentConfig):
         logging.exception("An error occurred when trying to upload the file to the artifact storage: %s" % e)
         raise e
 
+def output(arguments, deployment):
+    '''Output a deployment to disk'''
+
+    # dump content to disk
+    with open(arguments.output, 'w', encoding='utf-8') as outfile:
+        json.dump(deployment, outfile, indent=4, ensure_ascii=False)
+
 def update(arguments, deploymentConfig, deployment):
     '''Update a deployment'''
 
@@ -344,8 +351,22 @@ def update(arguments, deploymentConfig, deployment):
 
                 # debug
                 logging.debug(result.text)
+
+                # wait for running
+                waitDeploymentForDesiredState(arguments, deployment)
+
+                # output the installed Deployment
+                if arguments.output != None:
+                    # dump to disk
+                    output(arguments, deployment)
+
         else:
             logging.info("Deployment %s has no changes : Ignoring" % deployment['metadata']['name'])
+
+            # output the current Deployment
+            if arguments.output != None:
+                # dump to disk
+                output(arguments, deployment)
 
     except Exception as e:
         logging.exception("An error occurred trying to update the deployment %s target on the server: %s" % (deploymentConfig['metadata']['name'], e))
@@ -371,6 +392,11 @@ def create(arguments, deploymentConfig):
 
             # debug
             logging.debug(result.text)
+
+            # output the installed Deployment
+            if arguments.output != None:
+                # dump to disk
+                output(arguments, deploymentConfig)
 
     except Exception as e:
         logging.exception("An error occurred trying to create the deployment %s target on the server: %s" % (deploymentConfig['metadata']['name'], e))
@@ -480,9 +506,6 @@ def applyCommand(arguments):
 
                 # update the deployment
                 update(arguments, deploymentConfig, deployment)
-
-                # wait for running
-                waitDeploymentForDesiredState(arguments, deployment)
             
             except Exception as e:
                 # don't try to rollback
@@ -496,8 +519,8 @@ def applyCommand(arguments):
                     # update the deployment
                     update(arguments, deployment, deploymentConfig)
 
-                    # wait for running
-                    waitDeploymentForDesiredState(arguments, deployment)
+                    # fail anyway
+                    raise Exception("Deployment %s failed on the server, the rollback was completed" % deploymentConfig['metadata']['name'])
 
         # deployment not found on the server
         else:
@@ -529,6 +552,7 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--delete", help="Delete a deployment", action="store_true")
     parser.add_argument("-u", "--upload", help="Must be used in conjunction with apply, uploads a file to Ververica Platform Artifact Storage (maximum of 50MB) and update the deployment with the uploaded file location", type=str)
     parser.add_argument("-r", "--rollback", help="Must be used in conjunction with apply, rollback a deployment to its previous state if the update action failed", action="store_true")
+    parser.add_argument("-o", "--output", help="Must be used in conjunction with apply or create, output the installed deployment to disk", type=str)
     parser.add_argument("--timeout", help="The length of time in seconds to wait before giving up on waiting", type=int, default=600)
     parser.add_argument("--dry-run", help="Only simulate actions without submit the request", action="store_true")
     parser.add_argument("--log-level", help="The log level (verbosity), from logging library", type=str, default="INFO")
