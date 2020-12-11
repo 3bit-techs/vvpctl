@@ -190,7 +190,13 @@ def findDeployment(arguments, deploymentConfig):
     deploymentsList = listDeployments(arguments)
 
     # search the deployment on the running deployments
-    return next((sub for sub in deploymentsList['items'] if sub['metadata']['name'] == deploymentConfig['metadata']['name']), None)
+    deployment = next((sub for sub in deploymentsList['items'] if sub['metadata']['name'] == deploymentConfig['metadata']['name']), None)
+
+    # check
+    if deployment == None:
+        raise Exception("Deployment %s was not found on the server (probably was removed during script execution)")
+
+    return deployment
 
 def readDeploymentConfig(arguments):
     '''Read the deployment config file from disk and parse the JSON'''
