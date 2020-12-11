@@ -524,8 +524,6 @@ if __name__ == "__main__":
     elif arguments.log_level == "DEBUG":
         level = logging.DEBUG
         HTTPConnection.debuglevel = 1
-    elif arguments.log_level == "NOTSET":
-        level = logging.NOTSET
 
     # config
     logging.basicConfig(
