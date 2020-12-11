@@ -525,7 +525,7 @@ def applyCommand(arguments):
                 else:
                     logging.info("The update of the deployment %s failed on the server, trying to rollback to its previous state" % deploymentConfig['metadata']['name'])
 
-                    # update the deployment
+                    # rollback the deployment
                     update(arguments, deployment, deploymentConfig)
 
                     # fail anyway
