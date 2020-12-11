@@ -89,6 +89,7 @@ def listDeployments(arguments):
     return getDeploymentsRequest.json()
 
 def findDeployment(arguments, deploymentConfig):
+    '''Find a deployment'''
 
     # retrieve the list of installed deployments
     deploymentsList = listDeployments(arguments)
@@ -98,7 +99,6 @@ def findDeployment(arguments, deploymentConfig):
         (sub for sub in deploymentsList['items'] if sub['metadata']['name'] == deploymentConfig['metadata']['name']), None)
     
     return deployment
-
 
 def readDeploymentConfig(arguments):
     '''Read the deployment config file from disk and parse the JSON'''
@@ -114,9 +114,19 @@ def readDeploymentConfig(arguments):
     return deploymentConfig
 
 def delete(arguments):
-    logging.info("Deleting")
+    '''Deletes a deployment'''
+
+    if not arguments.dry_run:
+
+        # delete
+        result = requests.delete("%s/api/v1/namespaces/%s/deployments/%s" % (
+            arguments.server, arguments.namespace, deployment['metadata']['id']), headers={"accept": "application/json", "content-type": "application/json"})
+
+        # error check
+        result.raise_for_status()
 
 def waitDeploymentForDesiredState(arguments, deploymentConfig):
+    '''Waits a deployment to transition to its desired state'''
 
     start = timer()
 
@@ -153,78 +163,38 @@ def waitDeploymentForDesiredState(arguments, deploymentConfig):
             # transition finished
             done = True
 
-def deleteCommand(arguments):
+def upload(arguments):
+    '''Uploads a file to Ververica Artifact Storage'''
+
+    # get the file size
+    fileSize = os.stat(arguments.upload).st_size
+
+    # sanity check
+    if fileSize > 50000000:
+        raise Exception("Exceeded maximum file lengh in bytes to upload (%d > 50000000)" % fileSize)
+
+    logging.info("Trying to upload artifact: %s (%d bytes)" % (arguments.upload, fileSize))
 
     try:
-        # retrieve the deployment config
-        deploymentConfig = readDeploymentConfig(arguments)
+        with open(arguments.upload, 'rb') as file:
 
-        # search the deployment on the running deployments
-        deployment = findDeployment(arguments, deploymentConfig)
+            # post multipart upload
+            result = requests.post("%s/artifacts/v1/namespaces/default/artifacts:upload" % arguments.server, files={'file': file})
 
-        # deployment found on the server
-        if deployment != None:
+            # error checking
+            result.raise_for_status()
 
-            # wait for transition
-            waitDeploymentForState(arguments, deployment)
+            logging.info("Successfully uploaded artifact:\n%s" % result.text)
 
-            # cancel
-            cancel(arguments, deployment)
-
-        else:
-            logging.info("Deployment %s not found on the server, skipping" % deploymentConfig['metadata']['name'])
-    except Exception as e:
-        logging.exception("An error occured when trying to delete the deployment: %s" % e)
-        # error
-        sys.exit(1)
-
-def updateCommand(arguments):
-
-    try:
-        # retrieve the deployment config
-        deploymentConfig = readDeploymentConfig(arguments)
-
-        # retrieve the deployment target
-        deploymentTarget = findDeploymentTarget(arguments)
-
-        # setting deployment target id if not specified
-        if 'deploymentTargetId' not in deploymentConfig['spec']:
-            deploymentConfig['spec']['deploymentTargetId'] = deploymentTarget['metadata']['id']
-
-        # search the deployment on the running deployments
-        deployment = findDeployment(arguments, deploymentConfig)
-
-        # deployment found on the server
-        if deployment != None:
-
-            # wait for transition (if any)
-            waitDeploymentForDesiredState(arguments, deployment)
-
-            # update the deployment
-            update(arguments, deploymentConfig, deployment)
-
-            # wait for running
-            waitDeploymentForDesiredState(arguments, deployment)
-
-        # deployment not found on the server
-        else:
-
-            # create the deployment
-            create(arguments, deploymentConfig)
-
-            # wait for running
-            waitDeploymentForDesiredState(arguments, deployment)
+            # return the artifact info
+            return result.json()
 
     except Exception as e:
-        logging.exception("An error occured when trying to update the deployment: %s" % e)
-        # error
-        sys.exit(1)
-
-def upload():
-    logging.info("Uploading")
-
+        logging.exception("An error occurred when trying to upload the file to the artifact storage %s" % e)
+        raise e
 
 def update(arguments, deploymentConfig, deployment):
+    '''Update or create a deployment'''
     
     logging.info("Looking for changes on deployment %s (Desired state: %s, Current state: %s)" % (
                 deployment['metadata']['name'], deployment['spec']['state'], deployment['status']['state']))
@@ -280,6 +250,94 @@ def cancel(arguments, deployment):
         # error check
         result.raise_for_status()
 
+def deleteCommand(arguments):
+    '''Deletes a deployment'''
+
+    try:
+        # retrieve the deployment config
+        deploymentConfig = readDeploymentConfig(arguments)
+
+        # search the deployment on the running deployments
+        deployment = findDeployment(arguments, deploymentConfig)
+
+        # deployment found on the server
+        if deployment != None:
+
+            # wait for transition
+            waitDeploymentForState(arguments, deployment)
+
+            # cancel
+            cancel(arguments, deployment)
+
+            # wait for transition
+            waitDeploymentForState(arguments, deployment)
+
+            # delete
+            delete(arguments, deployment)
+
+        else:
+            logging.info("Deployment %s not found on the server : Ignoring" % deploymentConfig['metadata']['name'])
+
+    except Exception as e:
+        logging.exception("An error occured when trying to delete the deployment: %s" % e)
+        # error
+        sys.exit(1)
+
+def applyCommand(arguments):
+    '''Apply the configuration on a deployment'''
+
+    try:
+        # retrieve the deployment config
+        deploymentConfig = readDeploymentConfig(arguments)
+
+        # retrieve the deployment target
+        deploymentTarget = findDeploymentTarget(arguments)
+
+        # setting deployment target id if not specified
+        if 'deploymentTargetId' not in deploymentConfig['spec']:
+            deploymentConfig['spec']['deploymentTargetId'] = deploymentTarget['metadata']['id']
+
+        # search the deployment on the running deployments
+        deployment = findDeployment(arguments, deploymentConfig)
+
+        # uploads a file to artifact storage
+        if arguments.upload != None:
+
+            # upload
+            artifact = upload(arguments)
+
+            # only upload
+            if not arguments.apply:
+                return
+
+            # set the artifact
+            deploymentConfig['spec']['template']['spec']['artifact']['jarUri'] = artifact['artifact']['uri']
+
+        # deployment found on the server
+        if deployment != None:
+
+            # wait for transition (if any)
+            waitDeploymentForDesiredState(arguments, deployment)
+
+            # update the deployment
+            update(arguments, deploymentConfig, deployment)
+
+            # wait for running
+            waitDeploymentForDesiredState(arguments, deployment)
+
+        # deployment not found on the server
+        else:
+
+            # create the deployment
+            create(arguments, deploymentConfig)
+
+            # wait for running
+            waitDeploymentForDesiredState(arguments, deployment)
+
+    except Exception as e:
+        logging.exception("An error occured when trying to update the deployment: %s" % e)
+        # error
+        sys.exit(1)
 
 if __name__ == "__main__":
     """main
@@ -300,15 +358,16 @@ if __name__ == "__main__":
     parser.add_argument("-s", "--server", help="The ververica platform server address. E.g: http://localhost:8080", type=str, required=True)
     parser.add_argument("-n", "--namespace", help="The ververica platform namespace. Note: This feature is only available in Ververica Platform Stream Edition and above", default="default", type=str)
     parser.add_argument("-t", "--deployment-target", help="The Deployment target, which corresponds to different Kubernetes namespaces in the same Kubernetes cluster. If the deployment target doesn't exists the cli will attempt to create one", default="vvp-jobs", type=str)
-    parser.add_argument("-u", "--update", help="Update a deployment", action="store_true")
+    parser.add_argument("-a", "--apply", help="Apply a configuration to a deployment", action="store_true")
     parser.add_argument("-d", "--delete", help="Delete a deployment", action="store_true")
+    parser.add_argument("-u", "--upload", help="Uploads a file to Ververica Platform Artifact Storage (maximum of 50mb), if used in conjunction with apply, the cli will update the deployment with the uploaded file location", type=str)
     parser.add_argument("--timeout", help="The length of time in seconds to wait before giving up on waiting", type=int, default=600)
     parser.add_argument("--dry-run", help="Only simulate actions without submit the request", action="store_true")
 
     arguments = parser.parse_args()
 
-    if arguments.update:
-        updateCommand(arguments)
+    if arguments.apply or arguments.upload:
+        applyCommand(arguments)
 
     elif arguments.delete:
         deleteCommand(arguments)
