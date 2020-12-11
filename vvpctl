@@ -43,7 +43,7 @@ def deleteArtifact(arguments, artifact):
 
     try:
 
-        logging.info("Deleting artifact %s from server : dry_run=%s" % (artifact['filename'], str(arguments.dry_run)))
+        logging.info("Deleting artifact %s from server : dry_run = %s" % (artifact['filename'], str(arguments.dry_run)))
 
         # dry run
         if not arguments.dry_run:
@@ -294,7 +294,7 @@ def upload(arguments, deploymentConfig):
         if fileSize > 50000000:
             raise Exception("Exceeded maximum file lengh in bytes to upload (%d > 50000000)" % fileSize)
 
-        logging.info("Trying to upload artifact: %s (%d bytes) : dry_run=%s" % (arguments.upload, fileSize, str(arguments.dry_run)))
+        logging.info("Trying to upload artifact: %s (%d bytes) : dry_run = %s" % (arguments.upload, fileSize, str(arguments.dry_run)))
 
         # dry run
         if not arguments.dry_run:
