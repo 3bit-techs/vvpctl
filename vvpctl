@@ -230,6 +230,10 @@ def delete(arguments, deploymentConfig):
 def waitDeploymentForDesiredState(arguments, deploymentConfig):
     '''Waits a deployment to transition to its desired state'''
 
+    # dry run doesn't require to wait
+    if arguments.dry_run:
+        return
+
     # measuring time for timeout
     start = timer()
 
@@ -481,7 +485,7 @@ def applyCommand(arguments):
             create(arguments, deploymentConfig)
 
             # wait for running
-            waitDeploymentForDesiredState(arguments, deployment)
+            waitDeploymentForDesiredState(arguments, deploymentConfig)
 
     except Exception as e:
         logging.exception("An error occurred trying to update the deployment: %s" % e)
