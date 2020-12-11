@@ -1,4 +1,4 @@
 #!make
 
 build:
-	python setup.py bdist_wheel
+	python3.7 -m pip install .
