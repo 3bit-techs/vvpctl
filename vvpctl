@@ -210,9 +210,12 @@ def readDeploymentConfig(arguments):
 def delete(arguments, deploymentConfig):
     '''Deletes a deployment'''
 
-    logging.info("Deleting deployment %s : dry_run = %s" % (deploymentConfig['metadata']['name'], str(arguments.dry_run)))
-
     try:
+
+        # wait for transition (if any)
+        waitDeploymentForDesiredState(arguments, deploymentConfig)
+
+        logging.info("Deleting deployment %s : dry_run = %s" % (deploymentConfig['metadata']['name'], str(arguments.dry_run)))
 
         if not arguments.dry_run:
 
@@ -323,14 +326,23 @@ def upload(arguments, deploymentConfig):
 def output(arguments, deployment):
     '''Output a deployment to disk'''
 
-    # dump content to disk
-    with open(arguments.output, 'w', encoding='utf-8') as outfile:
-        json.dump(deployment, outfile, indent=4, ensure_ascii=False)
+    try:
+        if arguments.output != None:
+            # dump content to disk
+            with open(arguments.output, 'w', encoding='utf-8') as outfile:
+                json.dump(deployment, outfile, indent=4, ensure_ascii=False)
+
+    except Exception as e:
+        logging.exception("An error occurred when trying to output the deployment to the disk: %s" % e)
+        raise e
 
 def update(arguments, deploymentConfig, deployment):
     '''Update a deployment'''
 
     try:
+        # wait for transition (if any)
+        waitDeploymentForDesiredState(arguments, deployment)
+
         logging.info("Looking for changes on deployment %s (Desired state: %s, Current state: %s)" % (
                     deployment['metadata']['name'], deployment['spec']['state'], deployment['status']['state']))
 
@@ -356,17 +368,13 @@ def update(arguments, deploymentConfig, deployment):
                 waitDeploymentForDesiredState(arguments, deployment)
 
                 # output the installed Deployment
-                if arguments.output != None:
-                    # dump to disk
-                    output(arguments, deployment)
+                output(arguments, deployment)
 
         else:
             logging.info("Deployment %s has no changes : Ignoring" % deployment['metadata']['name'])
 
             # output the current Deployment
-            if arguments.output != None:
-                # dump to disk
-                output(arguments, deployment)
+            output(arguments, deployment)
 
     except Exception as e:
         logging.exception("An error occurred trying to update the deployment %s target on the server: %s" % (deploymentConfig['metadata']['name'], e))
@@ -376,6 +384,9 @@ def create(arguments, deploymentConfig):
     '''Create a deployment'''
 
     try:
+
+        # wait for transition (if any)
+        waitDeploymentForDesiredState(arguments, deploymentConfig)
 
         # creating deployment
         logging.info("Creating deployment %s : dry_run = %s" % (deploymentConfig['metadata']['name'], str(arguments.dry_run)))
@@ -393,10 +404,11 @@ def create(arguments, deploymentConfig):
             # debug
             logging.debug(result.text)
 
+            # wait for running
+            waitDeploymentForDesiredState(arguments, deploymentConfig)
+
             # output the installed Deployment
-            if arguments.output != None:
-                # dump to disk
-                output(arguments, deploymentConfig)
+            output(arguments, deploymentConfig)
 
     except Exception as e:
         logging.exception("An error occurred trying to create the deployment %s target on the server: %s" % (deploymentConfig['metadata']['name'], e))
@@ -406,6 +418,9 @@ def cancel(arguments, deploymentConfig):
     '''Cancel a deployment'''
 
     try:
+
+        # wait for transition (if any)
+        waitDeploymentForDesiredState(arguments, deploymentConfig)
 
         logging.info("Cancelling deployment %s (Desired state: %s, Current state: %s) : dry_run = %s" % (
                     deploymentConfig['metadata']['name'], deploymentConfig['spec']['state'], deploymentConfig['status']['state'], str(arguments.dry_run)))
@@ -422,6 +437,9 @@ def cancel(arguments, deploymentConfig):
 
             # error check
             result.raise_for_status()
+
+            # wait for running
+            waitDeploymentForDesiredState(arguments, deploymentConfig)
 
             # debug
             logging.debug(result.text)
@@ -444,14 +462,8 @@ def deleteCommand(arguments):
         # deployment found on the server
         if deployment != None:
 
-            # wait for transition
-            waitDeploymentForDesiredState(arguments, deployment)
-
             # cancel
             cancel(arguments, deployment)
-
-            # wait for transition
-            waitDeploymentForDesiredState(arguments, deployment)
 
             # delete
             delete(arguments, deployment)
@@ -499,9 +511,6 @@ def applyCommand(arguments):
         # deployment found on the server
         if deployment != None:
 
-            # wait for transition (if any)
-            waitDeploymentForDesiredState(arguments, deployment)
-
             try:
 
                 # update the deployment
@@ -527,9 +536,6 @@ def applyCommand(arguments):
 
             # create the deployment
             create(arguments, deploymentConfig)
-
-            # wait for running
-            waitDeploymentForDesiredState(arguments, deploymentConfig)
 
     except Exception as e:
         logging.exception("An error occurred trying to update the deployment: %s" % e)
