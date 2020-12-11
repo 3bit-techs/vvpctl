@@ -529,7 +529,7 @@ def applyCommand(arguments):
                     update(arguments, deployment, deploymentConfig)
 
                     # fail anyway
-                    raise Exception("Deployment %s failed on the server, the rollback was completed" % deploymentConfig['metadata']['name'])
+                    raise Exception("Deployment %s failed on the server, the rollback was completed" % deploymentConfig['metadata']['name']) from e
 
         # deployment not found on the server
         else:
