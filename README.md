@@ -14,7 +14,8 @@ Cli used to manage Apache Flink® Jobs installed on Ververica Plataform® Deploy
 * Dry run mode
 * Automatic Deployment Target creation and reference on the deployment
 * Synchronous interactions with the API (waiting for the desired state transition)
-* Automatic self-heal a Deployment by cancelling it when the current state is `FAILED`.
+* Automatic self-heal a Deployment by cancelling it when the current state is `FAILED`
+* Automatic rollback of a Deployment to its previous state (when updating)
 
 ## Install
 
@@ -43,7 +44,7 @@ Example usage:
 
 ```text
 usage: vvpctl [-h] -f FILE -s SERVER [-n NAMESPACE] [-t DEPLOYMENT_TARGET]
-              [-a] [-d] [-u UPLOAD] [--timeout TIMEOUT] [--dry-run]
+              [-a] [-d] [-u UPLOAD] [-r] [--timeout TIMEOUT] [--dry-run]
               [--log-level LOG_LEVEL] [--purge]
               [--keep-artifacts KEEP_ARTIFACTS]
 
@@ -71,6 +72,9 @@ optional arguments:
                         to Ververica Platform Artifact Storage (maximum of
                         50MB) and update the deployment with the uploaded file
                         location
+  -r, --rollback        Must be used in conjunction with apply, rollback a
+                        deployment to its previous state if the update action
+                        failed
   --timeout TIMEOUT     The length of time in seconds to wait before giving up
                         on waiting
   --dry-run             Only simulate actions without submit the request

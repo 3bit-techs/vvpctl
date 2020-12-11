@@ -476,11 +476,28 @@ def applyCommand(arguments):
             # wait for transition (if any)
             waitDeploymentForDesiredState(arguments, deployment)
 
-            # update the deployment
-            update(arguments, deploymentConfig, deployment)
+            try:
 
-            # wait for running
-            waitDeploymentForDesiredState(arguments, deployment)
+                # update the deployment
+                update(arguments, deploymentConfig, deployment)
+
+                # wait for running
+                waitDeploymentForDesiredState(arguments, deployment)
+            
+            except Exception as e:
+                # don't try to rollback
+                if not arguments.rollback:
+                    raise e
+
+                # try to rollback
+                else:
+                    logging.info("The update of the deployment %s failed on the server, trying to rollback to its previous state" % deploymentConfig['metadata']['name'])
+
+                    # update the deployment
+                    update(arguments, deployment, deploymentConfig)
+
+                    # wait for running
+                    waitDeploymentForDesiredState(arguments, deployment)
 
         # deployment not found on the server
         else:
@@ -511,6 +528,7 @@ if __name__ == "__main__":
     parser.add_argument("-a", "--apply", help="Apply a configuration to a deployment", action="store_true")
     parser.add_argument("-d", "--delete", help="Delete a deployment", action="store_true")
     parser.add_argument("-u", "--upload", help="Must be used in conjunction with apply, uploads a file to Ververica Platform Artifact Storage (maximum of 50MB) and update the deployment with the uploaded file location", type=str)
+    parser.add_argument("-r", "--rollback", help="Must be used in conjunction with apply, rollback a deployment to its previous state if the update action failed", action="store_true")
     parser.add_argument("--timeout", help="The length of time in seconds to wait before giving up on waiting", type=int, default=600)
     parser.add_argument("--dry-run", help="Only simulate actions without submit the request", action="store_true")
     parser.add_argument("--log-level", help="The log level (verbosity), from logging library", type=str, default="INFO")
