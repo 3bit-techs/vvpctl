@@ -6,15 +6,15 @@ Cli used to manage Apache Flink® Jobs installed on Ververica Plataform® Deploy
 
 ## Features
 
-* Delete deployments
-* Declarative way of apply changes on deployments
+* Delete Deployments
+* Declarative way of applying changes on Deployments
 * Jar upload to the Artifact Storage (maximum of 50MB) and automatic reference when applying changes
 * Drift detection before applying changes
 * Automatic old artifacts purge
 * Dry run mode
-* Automatic deployment target creation and reference on the deployment
+* Automatic Deployment Target creation and reference on the deployment
 * Synchronous interactions with the API (waiting for the desired state transition)
-* Automatic cancel a Deployment when the current state is `FAILED`.
+* Automatic self-heal a Deployment by cancelling it when the current state is `FAILED`.
 
 ## Install
 
