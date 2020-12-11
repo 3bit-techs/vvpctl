@@ -13,6 +13,76 @@ import sys
 from timeit import default_timer as timer
 from deepdiff import DeepDiff
 from argparse import ArgumentParser
+from http.client import HTTPConnection
+from re import search
+from datetime import datetime
+
+def listArtifacts(arguments):
+    '''List the deployed artifacts on Ververica Platform Artifact Storage'''
+
+    try:
+
+        # list artifacts request
+        listArtifactsResult = requests.get("%s/artifacts/v1/namespaces/%s/artifacts:list" % (arguments.server, arguments.namespace), headers={"accept": "application/json", "content-type": "application/json"})
+
+        # error check
+        listArtifactsResult.raise_for_status()
+
+        # debug
+        logging.debug(listArtifactsResult.text)
+
+        # parse and return
+        return listArtifactsResult.json()
+
+    except Exception as e:
+        logging.exception("An error occurred trying to list the artifacts on the server: %s" % e)
+        raise e
+
+def deleteArtifact(arguments, artifact):
+    '''Delete an artifact from artifact storage'''
+
+    try:
+
+        logging.info("Deleting artifact %s from server : dry_run=%s" % (artifact['filename'], str(arguments.dry_run)))
+
+        # dry run
+        if not arguments.dry_run:
+
+            # delete
+            deleteArtifactResult = requests.delete("%s/artifacts/v1/namespaces/%s/artifacts:delete?filename=%s" % (arguments.server, arguments.namespace, artifact['filename']), headers={"accept": "application/json", "content-type": "application/json"})
+
+            # check error
+            deleteArtifactResult.raise_for_status()
+
+    except Exception as e:
+        logging.exception("An error occurred trying to list the artifacts on the server: %s" % e)
+        raise e
+
+def purgeOldArtifacts(arguments, deploymentConfig):
+    '''Purge old artifacts related to the deployment from the storage'''
+
+    # retrieve the artifact list
+    artifacts = listArtifacts(arguments)
+
+    # sort by creation time (ascending)
+    sortedArtifacts = sorted(artifacts['artifacts'], key=lambda artifact: datetime.strptime(artifact['createTime'], "%Y-%m-%dT%H:%M:%SZ"))
+
+    # purge candidate list
+    purgeCandidates = list()
+
+    # iterate
+    for artifact in sortedArtifacts:
+        # looking for artifacts by deployment name
+        if search(deploymentConfig['metadata']['name'], artifact['filename']):
+            # add to list
+            purgeCandidates.append(artifact)
+
+    # purge
+    while len(purgeCandidates) > arguments.keep_artifacts:
+        logging.info("Will purge artifact because the number of old artifacts %d is greater than the desired number to keep %d" % (len(purgeCandidates), arguments.keep_artifacts))
+
+        # remove oldest artifact
+        deleteArtifact(arguments, purgeCandidates.pop(0))
 
 def findDeploymentTarget(arguments):
     ''' Find the default deployment target on the list of all deployment targets, and if found return it's id, otherwise create one and return it's id '''
@@ -25,6 +95,9 @@ def findDeploymentTarget(arguments):
 
         # error check
         getDeploymentTargetsRequest.raise_for_status()
+
+        # debug
+        logging.debug(getDeploymentTargetsRequest.text)
 
         # search the deployment target on the server list
         deploymentTarget = next((sub for sub in getDeploymentTargetsRequest.json()[
@@ -44,7 +117,7 @@ def findDeploymentTarget(arguments):
         return deploymentTarget
 
     except Exception as e:
-        logging.exception("An error occurred trying to find the deployment target %s on the server %s " % (arguments.deployment_target, e))
+        logging.exception("An error occurred trying to find the deployment target %s on the server: %s" % (arguments.deployment_target, e))
         raise e
 
 def createDeploymentTarget(arguments):
@@ -79,10 +152,13 @@ def createDeploymentTarget(arguments):
             # error check
             result.raise_for_status()
 
+            # debug
+            logging.debug(result.text)
+
             return result.json()
 
     except Exception as e:
-        logging.exception("An error occurred trying to create a deployment target on the server %s " % e)
+        logging.exception("An error occurred trying to create a deployment target on the server: %s" % e)
         raise e
 
 def listDeployments(arguments):
@@ -97,11 +173,14 @@ def listDeployments(arguments):
         # error check
         getDeploymentsRequest.raise_for_status()
 
+        # debug
+        logging.debug(getDeploymentsRequest.text)
+
         # get deployments
         return getDeploymentsRequest.json()
 
     except Exception as e:
-        logging.exception("An error occurred trying to list all deployments from server %s " % e)
+        logging.exception("An error occurred trying to list all deployments from server: %s" % e)
         raise e
 
 def findDeployment(arguments, deploymentConfig):
@@ -125,7 +204,7 @@ def readDeploymentConfig(arguments):
             return json.load(deploymentConfigFile)
 
     except Exception as e:
-        logging.exception("An error occurred when trying to read the deployment config file %s" % e)
+        logging.exception("An error occurred when trying to read the deployment config file: %s" % e)
         raise e
 
 def delete(arguments, deploymentConfig):
@@ -145,7 +224,7 @@ def delete(arguments, deploymentConfig):
             result.raise_for_status()
 
     except Exception as e:
-        logging.exception("An error occurred trying to delete the deployment %s target from the server %s " % (deploymentConfig['metadata']['name'], e))
+        logging.exception("An error occurred trying to delete the deployment %s target from the server: %s" % (deploymentConfig['metadata']['name'], e))
         raise e
 
 def waitDeploymentForDesiredState(arguments, deploymentConfig):
@@ -195,7 +274,7 @@ def waitDeploymentForDesiredState(arguments, deploymentConfig):
             # transition finished
             done = True
 
-def upload(arguments):
+def upload(arguments, deploymentConfig):
     '''Uploads a file to the Ververica Artifact Storage'''
 
     try:
@@ -203,27 +282,34 @@ def upload(arguments):
         # get the file size
         fileSize = os.stat(arguments.upload).st_size
 
+        # name convention (needed for purge)
+        if not search(deploymentConfig['metadata']['name'], arguments.upload):
+            raise Exception("The file name to upload %s must be prefixed by the deployment name %s" % (arguments.upload, deploymentConfig['metadata']['name']))
+
         # sanity check
         if fileSize > 50000000:
             raise Exception("Exceeded maximum file lengh in bytes to upload (%d > 50000000)" % fileSize)
 
-        logging.info("Trying to upload artifact: %s (%d bytes)" % (arguments.upload, fileSize))
+        logging.info("Trying to upload artifact: %s (%d bytes) : dry_run=%s" % (arguments.upload, fileSize, str(arguments.dry_run)))
 
-        with open(arguments.upload, 'rb') as file:
+        # dry run
+        if not arguments.dry_run:
 
-            # post multipart upload
-            result = requests.post("%s/artifacts/v1/namespaces/default/artifacts:upload" % arguments.server, files={'file': file})
+            with open(arguments.upload, 'rb') as file:
 
-            # error checking
-            result.raise_for_status()
+                # post multipart upload
+                result = requests.post("%s/artifacts/v1/namespaces/default/artifacts:upload" % arguments.server, files={'file': file})
 
-            logging.info("Successfully uploaded artifact:\n%s" % result.text)
+                # error checking
+                result.raise_for_status()
 
-            # return the artifact info
-            return result.json()
+                logging.info("Successfully uploaded artifact:\n%s" % result.text)
+
+                # return the artifact info
+                return result.json()
 
     except Exception as e:
-        logging.exception("An error occurred when trying to upload the file to the artifact storage %s" % e)
+        logging.exception("An error occurred when trying to upload the file to the artifact storage: %s" % e)
         raise e
 
 def update(arguments, deploymentConfig, deployment):
@@ -247,11 +333,14 @@ def update(arguments, deploymentConfig, deployment):
 
                 # error check
                 result.raise_for_status()
+
+                # debug
+                logging.debug(result.text)
         else:
             logging.info("Deployment %s has no changes : Ignoring" % deployment['metadata']['name'])
 
     except Exception as e:
-        logging.exception("An error occurred trying to update the deployment %s target on the server %s " % (deploymentConfig['metadata']['name'], e))
+        logging.exception("An error occurred trying to update the deployment %s target on the server: %s" % (deploymentConfig['metadata']['name'], e))
         raise e
 
 def create(arguments, deploymentConfig):
@@ -272,8 +361,11 @@ def create(arguments, deploymentConfig):
             # error check
             result.raise_for_status()
 
+            # debug
+            logging.debug(result.text)
+
     except Exception as e:
-        logging.exception("An error occurred trying to create the deployment %s target on the server %s " % (deploymentConfig['metadata']['name'], e))
+        logging.exception("An error occurred trying to create the deployment %s target on the server: %s" % (deploymentConfig['metadata']['name'], e))
         raise e
 
 def cancel(arguments, deploymentConfig):
@@ -297,8 +389,11 @@ def cancel(arguments, deploymentConfig):
             # error check
             result.raise_for_status()
 
+            # debug
+            logging.debug(result.text)
+
     except Exception as e:
-        logging.exception("An error occurred trying to cancel the deployment %s target on the server %s " % (deploymentConfig['metadata']['name'], e))
+        logging.exception("An error occurred trying to cancel the deployment %s target on the server: %s" % (deploymentConfig['metadata']['name'], e))
         raise e
 
 def deleteCommand(arguments):
@@ -356,14 +451,16 @@ def applyCommand(arguments):
         if arguments.upload != None:
 
             # upload
-            artifact = upload(arguments)
+            artifact = upload(arguments, deploymentConfig)
 
-            # only upload
-            if not arguments.apply:
-                return
+            # check
+            if artifact != None:
+                # set the artifact
+                deploymentConfig['spec']['template']['spec']['artifact']['jarUri'] = artifact['artifact']['uri']
 
-            # set the artifact
-            deploymentConfig['spec']['template']['spec']['artifact']['jarUri'] = artifact['artifact']['uri']
+            # purge old artifacts
+            if arguments.purge:
+                purgeOldArtifacts(arguments, deploymentConfig)
 
         # deployment found on the server
         if deployment != None:
@@ -397,13 +494,6 @@ if __name__ == "__main__":
     The application main method.
     """
 
-    # logging
-    logging.basicConfig(
-        format="%(asctime)s - %(module)s - %(levelname)s - %(message)s",
-        level=logging.INFO,
-        datefmt="%m/%d/%Y %I:%M:%S %p",
-    )
-
     # parsing arguments
     parser = ArgumentParser(prog="vvpctl", description="Ververica Platform Cli, used to interact with the Application Manager API")
     parser.add_argument("-f", "--file", help="The deployment file", type=str, required=True)
@@ -412,13 +502,39 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--deployment-target", help="The Deployment target, which corresponds to different Kubernetes namespaces in the same Kubernetes cluster. If the deployment target doesn't exists the cli will attempt to create one", default="vvp-jobs", type=str)
     parser.add_argument("-a", "--apply", help="Apply a configuration to a deployment", action="store_true")
     parser.add_argument("-d", "--delete", help="Delete a deployment", action="store_true")
-    parser.add_argument("-u", "--upload", help="Uploads a file to Ververica Platform Artifact Storage (maximum of 50mb), if used in conjunction with apply, the cli will update the deployment with the uploaded file location", type=str)
+    parser.add_argument("-u", "--upload", help="Must be used in conjunction with apply, uploads a file to Ververica Platform Artifact Storage (maximum of 50MB) and update the deployment with the uploaded file location", type=str)
     parser.add_argument("--timeout", help="The length of time in seconds to wait before giving up on waiting", type=int, default=600)
     parser.add_argument("--dry-run", help="Only simulate actions without submit the request", action="store_true")
+    parser.add_argument("--log-level", help="The log level (verbosity), from logging library", type=str, default="INFO")
+    parser.add_argument("--purge", help="Used in conjunction with upload, purge old artifacts from artifact storage", action="store_true")
+    parser.add_argument("--keep-artifacts", help="Used in conjunction with purge, specify how many artifacts to keep (from oldest to newest)", type=int, default=3)
 
     arguments = parser.parse_args()
 
-    if arguments.apply or arguments.upload:
+    # logging
+    level = logging.INFO
+
+    # level
+    if arguments.log_level == "ERROR":
+        level = logging.ERROR
+    elif arguments.log_level == "CRITICAL":
+        level = logging.CRITICAL
+    elif arguments.log_level == "WARNING":
+        level = logging.WARNING
+    elif arguments.log_level == "DEBUG":
+        level = logging.DEBUG
+        HTTPConnection.debuglevel = 1
+    elif arguments.log_level == "NOTSET":
+        level = logging.NOTSET
+
+    # config
+    logging.basicConfig(
+        format="%(asctime)s - %(module)s - %(levelname)s - %(message)s",
+        level=level,
+        datefmt="%m/%d/%Y %I:%M:%S %p",
+    )
+
+    if arguments.apply:
         applyCommand(arguments)
 
     elif arguments.delete:
