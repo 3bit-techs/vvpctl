@@ -1,8 +1,8 @@
 # Ververica Platform Cli (vvpctl)
 
-Cli used to manage Apache Flink® Jobs installed on Ververica Plataform® Deployments through the Application Manager API.
+Cli used to manage Apache Flink® Jobs installed as Ververica Plataform® Deployments through the [Application Manager API](https://docs.ververica.com/user_guide/application_operations/rest_api.html).
 
-**NOTE**: This tool currently only supports Jar Deployments.
+**NOTE**: This tool currently only supports [Jar Deployments](https://docs.ververica.com/user_guide/application_operations/deployments/index.html).
 
 ## Features
 
