@@ -521,6 +521,24 @@ def applyCommand(arguments):
 
                 # update the deployment
                 update(arguments, deploymentConfig, deployment)
+
+                # if the update didn't fail but we want to rollback if something's wrong, we wait for 3 minutes to se if the job is failing after the deploy
+                if arguments.rollback:
+
+                    logging.info("Checking if a rollback is needed, waiting for 5 minutes to verify if the deployment will keep a healthy status")
+
+                    # sleep for 5 minutes
+                    time.sleep(300)
+
+                    # grab the latest state
+                    deployment = findDeployment(arguments, deploymentConfig)
+
+                    # find a JobFailing Status
+                    isFailing =  next((sub for sub in deployment['status']['running']['conditions'] if sub['type'] == 'JobFailing' and sub['status'] == 'True'), None)
+
+                    # failed job status reported
+                    if isFailing != None:
+                        raise Exception("Deployment %s was successfuly updated, but after 5 minutes it transitioned to a Failing status, rollback needed")
             
             except Exception as e:
                 # don't try to rollback
