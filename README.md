@@ -13,6 +13,7 @@ Cli used to manage Apache Flink® Jobs installed as Ververica Plataform® Deploy
 * Automatic old artifacts purge
 * Dry run mode
 * Automatic Deployment Target creation and reference on the deployment
+* Reference Deployment Target by name (and not by ID)
 * Synchronous interactions with the API (waiting for the desired state transition)
 * Automatic self-heal a Deployment by cancelling it when the current state is `FAILED`
 * Automatic performs a health-check on the deployment after the update/create actions
