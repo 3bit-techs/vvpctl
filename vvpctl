@@ -271,8 +271,6 @@ def waitDeploymentForDesiredState(arguments, deploymentConfig):
             cancel(arguments, deployment)
 
         elif deployment['status']['state'] != deployment['spec']['state']:
-            logging.info("Deployment %s found on the server (Desired state: %s, Current state: %s) : Waiting for the states %s" % (
-                deployment['metadata']['name'], deployment['spec']['state'], deployment['status']['state'], str(desiredStates)))
 
             logging.info("Waiting for deployment %s transition (Desired state: %s, Current state: %s)" % (
                 deployment['metadata']['name'], deployment['spec']['state'], deployment['status']['state']))
