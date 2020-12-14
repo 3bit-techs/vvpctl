@@ -385,9 +385,6 @@ def create(arguments, deploymentConfig):
 
     try:
 
-        # wait for transition (if any)
-        waitDeploymentForDesiredState(arguments, deploymentConfig)
-
         # creating deployment
         logging.info("Creating deployment %s : dry_run = %s" % (deploymentConfig['metadata']['name'], str(arguments.dry_run)))
 
