@@ -554,7 +554,7 @@ if __name__ == "__main__":
     parser.add_argument("-u", "--upload", help="Must be used in conjunction with apply, uploads a file to Ververica Platform Artifact Storage (maximum of 50MB) and update the deployment with the uploaded file location", type=str)
     parser.add_argument("-r", "--rollback", help="Must be used in conjunction with apply, rollback a deployment to its previous state if the update action failed", action="store_true")
     parser.add_argument("-o", "--output", help="Must be used in conjunction with apply or create, output the installed deployment to disk", type=str)
-    parser.add_argument("--timeout", help="The length of time in seconds to wait before giving up on waiting", type=int, default=600)
+    parser.add_argument("--timeout", help="The length of time in seconds to wait before giving up on waiting", type=int, default=1800)
     parser.add_argument("--dry-run", help="Only simulate actions without submit the request", action="store_true")
     parser.add_argument("--log-level", help="The log level (verbosity), from logging library", type=str, default="INFO")
     parser.add_argument("--purge", help="Used in conjunction with upload, purge old artifacts from artifact storage", action="store_true")
