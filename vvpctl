@@ -106,7 +106,7 @@ def purgeOldArtifacts(arguments, deploymentConfig):
         deleteArtifact(arguments, purgeCandidates.pop(0))
 
 def findDeploymentTarget(arguments):
-    ''' Find the default deployment target on the list of all deployment targets, and if found return it's id, otherwise create one and return it's id '''
+    ''' Find the default deployment target on the list of all deployment targets, and if found return it, otherwise create one and return it'''
 
     try:
 
@@ -183,7 +183,7 @@ def createDeploymentTarget(arguments):
         raise e
 
 def listDeployments(arguments):
-    ''' List the list of all installed deployments'''
+    '''Returns the list of all installed deployments'''
 
     try:
 
@@ -205,7 +205,7 @@ def listDeployments(arguments):
         raise e
 
 def findDeployment(arguments, deploymentConfig):
-    '''Find a deployment'''
+    '''Find a deployment by name'''
 
     # retrieve the list of installed deployments
     deploymentsList = listDeployments(arguments)
@@ -229,7 +229,7 @@ def readDeploymentConfig(arguments):
         raise e
 
 def delete(arguments, deploymentConfig):
-    '''Deletes a deployment'''
+    '''Deletes a deployment by name'''
 
     try:
 
