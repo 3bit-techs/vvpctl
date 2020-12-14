@@ -414,9 +414,6 @@ def cancel(arguments, deploymentConfig):
 
     try:
 
-        # wait for transition (if any)
-        waitDeploymentForDesiredState(arguments, deploymentConfig)
-
         logging.info("Cancelling deployment %s (Desired state: %s, Current state: %s) : dry_run = %s" % (
                     deploymentConfig['metadata']['name'], deploymentConfig['spec']['state'], deploymentConfig['status']['state'], str(arguments.dry_run)))
 
@@ -456,6 +453,9 @@ def deleteCommand(arguments):
 
         # deployment found on the server
         if deployment != None:
+
+            # wait for transition (if any)
+            waitDeploymentForDesiredState(arguments, deploymentConfig)
 
             # cancel
             cancel(arguments, deployment)
