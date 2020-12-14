@@ -15,7 +15,7 @@ Cli used to manage Apache Flink® Jobs installed as Ververica Plataform® Deploy
 * Automatic Deployment Target creation and reference on the deployment
 * Synchronous interactions with the API (waiting for the desired state transition)
 * Automatic self-heal a Deployment by cancelling it when the current state is `FAILED`
-* Automatic rollback of a Deployment to its previous state (when updating) if a Failing Status was found (the cli will try to detect after 5 minutes) or the deployment operation itself failed.
+* Automatic rollback of a Deployment to its previous state (when updating) if a Failing Status was found (the cli will try to detect after `rollback-time` seconds) or the deployment operation itself failed.
 * Dumps the installed Deployment json to a file
 
 ## Install
