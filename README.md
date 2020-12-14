@@ -8,7 +8,7 @@ Cli used to manage Apache Flink® Jobs installed as Ververica Plataform® Deploy
 
 * Delete Deployments
 * Declarative way of applying changes on Deployments
-* Jar upload to the Artifact Storage (maximum of 50MB) and automatic reference when applying changes
+* Jar upload to the [Managed Artifact Storage](https://docs.ververica.com/user_guide/application_operations/artifact_management/index.html) (maximum of 50MB) and automatic reference when applying changes
 * Drift detection before applying changes
 * Automatic old artifacts purge
 * Dry run mode
