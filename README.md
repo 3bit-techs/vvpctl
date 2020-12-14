@@ -35,18 +35,24 @@ python -m pip uninstall vvpctl
 
 ## Usage
 
+Example usage:
+```bash
+vvpctl --server ${VERVERICA_HOST} --apply --file ${PROJECT_NAME}-${GIT_BRANCH}.json --upload ${JAR_FILE} --output target/${PROJECT_NAME}-${GIT_BRANCH}.json --purge --rollback --dry-run
+```
+
 Getting help:
 
 ```bash
 vvpctl -h
 ```
 
-Example usage:
+Example help:
 
 ```text
 usage: vvpctl [-h] -f FILE -s SERVER [-n NAMESPACE] [-t DEPLOYMENT_TARGET]
-              [-a] [-d] [-u UPLOAD] [-r] [-o OUTPUT] [--timeout TIMEOUT]
-              [--dry-run] [--log-level LOG_LEVEL] [--purge]
+              [-a] [-d] [-u UPLOAD] [-r] [--rollback-time ROLLBACK_TIME]
+              [-o OUTPUT] [--timeout TIMEOUT] [--dry-run]
+              [--log-level LOG_LEVEL] [--purge]
               [--keep-artifacts KEEP_ARTIFACTS]
 
 Ververica Platform Cli, used to interact with the Application Manager API
@@ -76,6 +82,10 @@ optional arguments:
   -r, --rollback        Must be used in conjunction with apply, rollback a
                         deployment to its previous state if the update action
                         failed
+  --rollback-time ROLLBACK_TIME
+                        Used in conjunction with rollback, the length of time
+                        in seconds to wait before checking the deployment for
+                        a Failing Status
   -o OUTPUT, --output OUTPUT
                         Must be used in conjunction with apply or create,
                         output the installed deployment to disk

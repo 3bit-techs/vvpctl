@@ -522,13 +522,13 @@ def applyCommand(arguments):
                 # update the deployment
                 update(arguments, deploymentConfig, deployment)
 
-                # if the update didn't fail but we want to rollback if something's wrong, we wait for 3 minutes to se if the job is failing after the deploy
+                # if the update didn't fail but we want to rollback if something's wrong, we wait to se if the job is failing after the deploy
                 if arguments.rollback:
 
-                    logging.info("Checking if a rollback is needed, waiting for 5 minutes to verify if the deployment will keep a healthy status")
+                    logging.info("Checking if a rollback is needed, waiting for %d seconds to verify if the deployment will keep a healthy status" % arguments.rollback_time)
 
-                    # sleep for 5 minutes
-                    time.sleep(300)
+                    # sleep
+                    time.sleep(arguments.rollback_time)
 
                     # grab the latest state
                     deployment = findDeployment(arguments, deploymentConfig)
@@ -538,7 +538,7 @@ def applyCommand(arguments):
 
                     # failed job status reported
                     if isFailing != None:
-                        raise Exception("Deployment %s was successfuly updated, but after 5 minutes it transitioned to a Failing status, rollback needed")
+                        raise Exception("Deployment %s was successfuly updated, but after %d seconds it transitioned to a Failing status, rollback needed" % (deployment['metadata']['name'], arguments.rollback_time))
             
             except Exception as e:
                 # don't try to rollback
@@ -582,6 +582,7 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--delete", help="Delete a deployment", action="store_true")
     parser.add_argument("-u", "--upload", help="Must be used in conjunction with apply, uploads a file to Ververica Platform Artifact Storage (maximum of 50MB) and update the deployment with the uploaded file location", type=str)
     parser.add_argument("-r", "--rollback", help="Must be used in conjunction with apply, rollback a deployment to its previous state if the update action failed", action="store_true")
+    parser.add_argument("--rollback-time", help="Used in conjunction with rollback, the length of time in seconds to wait before checking the deployment for a Failing Status", type=int, default=300)
     parser.add_argument("-o", "--output", help="Must be used in conjunction with apply or create, output the installed deployment to disk", type=str)
     parser.add_argument("--timeout", help="The length of time in seconds to wait before giving up on waiting", type=int, default=1800)
     parser.add_argument("--dry-run", help="Only simulate actions without submit the request", action="store_true")
