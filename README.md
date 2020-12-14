@@ -51,10 +51,10 @@ Example help:
 
 ```text
 usage: vvpctl [-h] -f FILE -s SERVER [-n NAMESPACE] [-t DEPLOYMENT_TARGET]
-              [-a] [-d] [-u UPLOAD] [-r] [-c]
-              [--health-check-time HEALTH_CHECK_TIME] [-o OUTPUT]
-              [--timeout TIMEOUT] [--dry-run] [--log-level LOG_LEVEL]
-              [--purge] [--keep-artifacts KEEP_ARTIFACTS]
+              [-a] [-d] [-u UPLOAD] [--purge]
+              [--keep-artifacts KEEP_ARTIFACTS] [-r] [-c]
+              [--health-check-time HEALTH_CHECK_TIME] [--timeout TIMEOUT]
+              [-o OUTPUT] [--log-level LOG_LEVEL] [--dry-run]
 
 Ververica Platform Cli, used to interact with the Application Manager API
 
@@ -80,6 +80,11 @@ optional arguments:
                         to Ververica Platform Artifact Storage (maximum of
                         50MB) and update the deployment with the uploaded file
                         location
+  --purge               Used in conjunction with upload, purge old artifacts
+                        from artifact storage
+  --keep-artifacts KEEP_ARTIFACTS
+                        Used in conjunction with purge, specify how many
+                        artifacts to keep (from oldest to newest)
   -r, --rollback        Must be used in conjunction with apply, rollback a
                         deployment to its previous state if the update action
                         failed
@@ -89,17 +94,13 @@ optional arguments:
                         Used in conjunction with health-check, the length of
                         time in seconds to wait before checking the deployment
                         for a Failing Status
-  -o OUTPUT, --output OUTPUT
-                        Must be used in conjunction with apply or create,
-                        output the installed deployment to disk
   --timeout TIMEOUT     The length of time in seconds to wait before giving up
-                        on waiting
-  --dry-run             Only simulate actions without submit the request
+                        on waiting for a deployment to transition to its
+                        desired state
+  -o OUTPUT, --output OUTPUT
+                        Must be used in conjunction with apply, output the
+                        actual installed deployment file to disk
   --log-level LOG_LEVEL
                         The log level (verbosity), from logging library
-  --purge               Used in conjunction with upload, purge old artifacts
-                        from artifact storage
-  --keep-artifacts KEEP_ARTIFACTS
-                        Used in conjunction with purge, specify how many
-                        artifacts to keep (from oldest to newest)
+  --dry-run             Only simulate actions without submit the request
 ```
