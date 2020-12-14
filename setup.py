@@ -19,7 +19,7 @@ setuptools.setup(
     ],
 
     classifiers=[
-        'License :: OSI Approved :: MIT License',  
+        'License :: OSI Approved :: Apache Software License',  
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python :: 3.7',
     ],
