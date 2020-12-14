@@ -473,7 +473,7 @@ def cancel(arguments, deploymentConfig):
             # error check
             result.raise_for_status()
 
-            # wait for running
+            # wait for cancelled
             waitDeploymentForDesiredState(arguments, deploymentConfig)
 
             # debug
