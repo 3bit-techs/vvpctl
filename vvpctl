@@ -527,8 +527,9 @@ def applyCommand(arguments):
 
                     logging.info("Checking if a rollback is needed, waiting for %d seconds to verify if the deployment will keep a healthy status" % arguments.rollback_time)
 
-                    # sleep
-                    time.sleep(arguments.rollback_time)
+                    if not arguments.dry_run:
+                        # sleep
+                        time.sleep(arguments.rollback_time)
 
                     # grab the latest state
                     deployment = findDeployment(arguments, deploymentConfig)
