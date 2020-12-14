@@ -364,8 +364,6 @@ def update(arguments, deploymentConfig, deployment):
     '''Update a deployment'''
 
     try:
-        # wait for transition (if any)
-        waitDeploymentForDesiredState(arguments, deployment)
 
         logging.info("Looking for changes on deployment %s (Desired state: %s, Current state: %s)" % (
                     deployment['metadata']['name'], deployment['spec']['state'], deployment['status']['state']))
@@ -553,6 +551,9 @@ def applyCommand(arguments):
 
             try:
 
+                # wait for transition (if any)
+                waitDeploymentForDesiredState(arguments, deployment)
+
                 # update the deployment
                 update(arguments, deploymentConfig, deployment)
 
@@ -564,6 +565,9 @@ def applyCommand(arguments):
                 # try to rollback
                 else:
                     logging.info("The update of the deployment %s failed on the server, trying to rollback to its previous state" % deploymentConfig['metadata']['name'])
+
+                    # wait for transition (if any)
+                    waitDeploymentForDesiredState(arguments, deployment)
 
                     # rollback the deployment
                     update(arguments, deployment, deploymentConfig)
