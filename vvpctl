@@ -349,8 +349,15 @@ def update(arguments, deploymentConfig, deployment):
         logging.info("Looking for changes on deployment %s (Desired state: %s, Current state: %s)" % (
                     deployment['metadata']['name'], deployment['spec']['state'], deployment['status']['state']))
 
+        # paths to exclude (transitory)
+        exclude_paths = {"root['status']", "root['metadata']['id']", "root['metadata']['createdAt']", "root['metadata']['modifiedAt']", "root['metadata']['resourceVersion']", "root['metadata']['annotations']['com.dataartisans.appmanager.controller.deployment.transitioning']", "root['metadata']['annotations']['com.dataartisans.appmanager.controller.deployment.spec.version']", "root['metadata']['annotations']['com.dataartisans.appmanager.controller.deployment.transitioning.since']"}
+
+        # if the cli manages the upload, ignores the jar uri field
+        if arguments.upload != None:
+            exclude_paths.add("root['spec']['template']['spec']['artifact']['jarUri']")
+
         # difference between current and server
-        diff = DeepDiff(deployment, deploymentConfig, exclude_paths={"root['status']", "root['metadata']['id']", "root['metadata']['createdAt']", "root['metadata']['modifiedAt']", "root['metadata']['resourceVersion']", "root['metadata']['annotations']['com.dataartisans.appmanager.controller.deployment.transitioning']", "root['metadata']['annotations']['com.dataartisans.appmanager.controller.deployment.spec.version']", "root['metadata']['annotations']['com.dataartisans.appmanager.controller.deployment.transitioning.since']"})
+        diff = DeepDiff(deployment, deploymentConfig, exclude_paths=exclude_paths)
 
         # changes found
         if bool(diff):
