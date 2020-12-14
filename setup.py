@@ -3,10 +3,15 @@
 
 import setuptools
 
+with open("README.md", "r", encoding="utf-8") as fh:
+    long_description = fh.read()
+
 setuptools.setup(
     name='vvpctl',
     version='0.1.0',    
     description='Ververica Platform Cli',
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     url='https://github.com/3bit-techs/vvpctl',
     author='Eduardo Goncalves',
     author_email='dudssource@gmail.com',
@@ -17,10 +22,10 @@ setuptools.setup(
         'DeepDiff==5.0.2',
         'argparse==1.4.0'
     ],
-
+    python_requires='>=3.6',
     classifiers=[
         'License :: OSI Approved :: Apache Software License',  
-        'Operating System :: POSIX :: Linux',
-        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3',
+        "Operating System :: OS Independent",
     ],
 )
