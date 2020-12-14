@@ -525,7 +525,7 @@ def applyCommand(arguments):
                 # if the update didn't fail but we want to rollback if something's wrong, we wait to se if the job is failing after the deploy
                 if arguments.rollback:
 
-                    logging.info("Checking if a rollback is needed, waiting for %d seconds to verify if the deployment will keep a healthy status" % arguments.rollback_time)
+                    logging.info("Checking if a rollback is needed, waiting for %d seconds to verify if the deployment will keep a healthy status : dry_run = %s" % (arguments.rollback_time, str(arguments.dry_run)))
 
                     if not arguments.dry_run:
                         # sleep
