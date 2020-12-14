@@ -398,6 +398,9 @@ def update(arguments, deploymentConfig, deployment):
                 # wait for running
                 waitDeploymentForDesiredState(arguments, deployment)
 
+                # performs a health check on the deployment
+                deploymentHealthCheck(arguments, deployment)
+
                 # output the installed Deployment
                 output(arguments, deployment)
 
@@ -436,6 +439,9 @@ def create(arguments, deploymentConfig):
 
             # wait for running
             waitDeploymentForDesiredState(arguments, deploymentConfig)
+
+            # performs a health check on the deployment
+            deploymentHealthCheck(arguments, deploymentConfig)
 
             # output the installed Deployment
             output(arguments, deploymentConfig)
@@ -550,9 +556,6 @@ def applyCommand(arguments):
                 # update the deployment
                 update(arguments, deploymentConfig, deployment)
 
-                # performs a health check on the deployment
-                deploymentHealthCheck(arguments, deploymentConfig)
-
             except Exception as e:
                 # don't try to rollback
                 if not arguments.rollback:
@@ -573,9 +576,6 @@ def applyCommand(arguments):
 
             # create the deployment
             create(arguments, deploymentConfig)
-
-            # performs a health check on the deployment
-            deploymentHealthCheck(arguments, deploymentConfig)
 
     except Exception as e:
         logging.exception("An error occurred trying to update the deployment: %s" % e)
