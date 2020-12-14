@@ -239,6 +239,9 @@ def waitDeploymentForDesiredState(arguments, deploymentConfig):
     if arguments.dry_run:
         return
 
+    # wait a little bit for the last action to be persisted by the Application Controller
+    time.sleep(10)
+
     # measuring time for timeout
     start = timer()
 
