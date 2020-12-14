@@ -17,6 +17,27 @@ from http.client import HTTPConnection
 from re import search
 from datetime import datetime
 
+def deploymentHealthCheck(arguments, deploymentConfig):
+    '''Performs a health check on the deployment'''
+
+    if arguments.health_check:
+
+        logging.info("Waiting for %d seconds to verify if the deployment will keep a healthy status : dry_run = %s" % (arguments.health_check_time, str(arguments.dry_run)))
+
+        if not arguments.dry_run:
+            # sleep
+            time.sleep(arguments.health_check_time)
+
+        # grab the latest state
+        deployment = findDeployment(arguments, deploymentConfig)
+
+        # find a JobFailing Status
+        isFailing =  next((sub for sub in deployment['status']['running']['conditions'] if sub['type'] == 'JobFailing' and sub['status'] == 'True'), None)
+
+        # failed job status reported
+        if isFailing != None:
+            raise Exception("Health check of deployment %s failed after %d seconds (Failing status found)" % (deploymentConfig['metadata']['name'], arguments.health_check_time))
+
 def listArtifacts(arguments):
     '''List the deployed artifacts on Ververica Platform Artifact Storage'''
 
@@ -529,25 +550,9 @@ def applyCommand(arguments):
                 # update the deployment
                 update(arguments, deploymentConfig, deployment)
 
-                # if the update didn't fail but we want to rollback if something's wrong, we wait to se if the job is failing after the deploy
-                if arguments.rollback:
+                # performs a health check on the deployment
+                deploymentHealthCheck(arguments, deploymentConfig)
 
-                    logging.info("Checking if a rollback is needed, waiting for %d seconds to verify if the deployment will keep a healthy status : dry_run = %s" % (arguments.rollback_time, str(arguments.dry_run)))
-
-                    if not arguments.dry_run:
-                        # sleep
-                        time.sleep(arguments.rollback_time)
-
-                    # grab the latest state
-                    deployment = findDeployment(arguments, deploymentConfig)
-
-                    # find a JobFailing Status
-                    isFailing =  next((sub for sub in deployment['status']['running']['conditions'] if sub['type'] == 'JobFailing' and sub['status'] == 'True'), None)
-
-                    # failed job status reported
-                    if isFailing != None:
-                        raise Exception("Deployment %s was successfuly updated, but after %d seconds it transitioned to a Failing status, rollback needed" % (deployment['metadata']['name'], arguments.rollback_time))
-            
             except Exception as e:
                 # don't try to rollback
                 if not arguments.rollback:
@@ -568,6 +573,9 @@ def applyCommand(arguments):
 
             # create the deployment
             create(arguments, deploymentConfig)
+
+            # performs a health check on the deployment
+            deploymentHealthCheck(arguments, deploymentConfig)
 
     except Exception as e:
         logging.exception("An error occurred trying to update the deployment: %s" % e)
@@ -590,7 +598,8 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--delete", help="Delete a deployment", action="store_true")
     parser.add_argument("-u", "--upload", help="Must be used in conjunction with apply, uploads a file to Ververica Platform Artifact Storage (maximum of 50MB) and update the deployment with the uploaded file location", type=str)
     parser.add_argument("-r", "--rollback", help="Must be used in conjunction with apply, rollback a deployment to its previous state if the update action failed", action="store_true")
-    parser.add_argument("--rollback-time", help="Used in conjunction with rollback, the length of time in seconds to wait before checking the deployment for a Failing Status", type=int, default=300)
+    parser.add_argument("-c", "--health-check", help="Performs a health check on the deployment after the update/create action", action="store_true")
+    parser.add_argument("--health-check-time", help="Used in conjunction with health-check, the length of time in seconds to wait before checking the deployment for a Failing Status", type=int, default=300)
     parser.add_argument("-o", "--output", help="Must be used in conjunction with apply or create, output the installed deployment to disk", type=str)
     parser.add_argument("--timeout", help="The length of time in seconds to wait before giving up on waiting", type=int, default=1800)
     parser.add_argument("--dry-run", help="Only simulate actions without submit the request", action="store_true")

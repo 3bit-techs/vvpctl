@@ -15,7 +15,8 @@ Cli used to manage Apache Flink® Jobs installed as Ververica Plataform® Deploy
 * Automatic Deployment Target creation and reference on the deployment
 * Synchronous interactions with the API (waiting for the desired state transition)
 * Automatic self-heal a Deployment by cancelling it when the current state is `FAILED`
-* Automatic rollback of a Deployment to its previous state (when updating) if a Failing Status was found (the cli will try to detect after `rollback-time` seconds) or the deployment operation itself failed.
+* Automatic performs a health-check on the deployment after the update/create actions
+* Automatic rollback of a Deployment to its previous state (when updating) if the health-check failed or the deployment operation itself failed
 * Dumps the installed Deployment json to a file
 
 ## Install
@@ -50,10 +51,10 @@ Example help:
 
 ```text
 usage: vvpctl [-h] -f FILE -s SERVER [-n NAMESPACE] [-t DEPLOYMENT_TARGET]
-              [-a] [-d] [-u UPLOAD] [-r] [--rollback-time ROLLBACK_TIME]
-              [-o OUTPUT] [--timeout TIMEOUT] [--dry-run]
-              [--log-level LOG_LEVEL] [--purge]
-              [--keep-artifacts KEEP_ARTIFACTS]
+              [-a] [-d] [-u UPLOAD] [-r] [-c]
+              [--health-check-time HEALTH_CHECK_TIME] [-o OUTPUT]
+              [--timeout TIMEOUT] [--dry-run] [--log-level LOG_LEVEL]
+              [--purge] [--keep-artifacts KEEP_ARTIFACTS]
 
 Ververica Platform Cli, used to interact with the Application Manager API
 
@@ -82,10 +83,12 @@ optional arguments:
   -r, --rollback        Must be used in conjunction with apply, rollback a
                         deployment to its previous state if the update action
                         failed
-  --rollback-time ROLLBACK_TIME
-                        Used in conjunction with rollback, the length of time
-                        in seconds to wait before checking the deployment for
-                        a Failing Status
+  -c, --health-check    Performs a health check on the deployment after the
+                        update/create action
+  --health-check-time HEALTH_CHECK_TIME
+                        Used in conjunction with health-check, the length of
+                        time in seconds to wait before checking the deployment
+                        for a Failing Status
   -o OUTPUT, --output OUTPUT
                         Must be used in conjunction with apply or create,
                         output the installed deployment to disk
