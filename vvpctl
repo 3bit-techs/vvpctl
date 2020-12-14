@@ -226,6 +226,8 @@ def delete(arguments, deploymentConfig):
             # error check
             result.raise_for_status()
 
+            logging.info("Successfully deleted deployment %s" % deploymentConfig['metadata']['name'])
+
     except Exception as e:
         logging.exception("An error occurred trying to delete the deployment %s target from the server: %s" % (deploymentConfig['metadata']['name'], e))
         raise e
@@ -368,6 +370,8 @@ def update(arguments, deploymentConfig, deployment):
                 # output the installed Deployment
                 output(arguments, deployment)
 
+                logging.info("Successfully updated deployment %s" % deployment['metadata']['name'])
+
         else:
             logging.info("Deployment %s has no changes : Ignoring" % deployment['metadata']['name'])
 
@@ -405,6 +409,8 @@ def create(arguments, deploymentConfig):
             # output the installed Deployment
             output(arguments, deploymentConfig)
 
+            logging.info("Successfully created deployment %s" % deploymentConfig['metadata']['name'])
+
     except Exception as e:
         logging.exception("An error occurred trying to create the deployment %s target on the server: %s" % (deploymentConfig['metadata']['name'], e))
         raise e
@@ -435,6 +441,8 @@ def cancel(arguments, deploymentConfig):
 
             # debug
             logging.debug(result.text)
+
+            logging.info("Successfully cancelled deployment %s" % deploymentConfig['metadata']['name'])
 
     except Exception as e:
         logging.exception("An error occurred trying to cancel the deployment %s target on the server: %s" % (deploymentConfig['metadata']['name'], e))
