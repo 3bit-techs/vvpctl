@@ -601,7 +601,7 @@ if __name__ == "__main__":
     parser.add_argument("--keep-artifacts", help="Used in conjunction with purge, specify how many artifacts to keep (from oldest to newest)", type=int, default=3)
     parser.add_argument("-r", "--rollback", help="Must be used in conjunction with apply, rollback a deployment to its previous state if the update action failed", action="store_true")
     parser.add_argument("-c", "--health-check", help="Performs a health check on the deployment after the update/create action", action="store_true")
-    parser.add_argument("--health-check-time", help="Used in conjunction with health-check, the length of time in seconds to wait before checking the deployment for a Failing Status", type=int, default=300)
+    parser.add_argument("--health-check-time", help="Used in conjunction with health-check, the length of time in seconds to wait before checking the deployment for a Failing Status", type=int, default=600)
     parser.add_argument("--timeout", help="The length of time in seconds to wait before giving up on waiting for a deployment to transition to its desired state", type=int, default=1800)
     parser.add_argument("-o", "--output", help="Must be used in conjunction with apply, output the actual installed deployment file to disk", type=str)
     parser.add_argument("--log-level", help="The log level (verbosity), from logging library", type=str, default="INFO")
